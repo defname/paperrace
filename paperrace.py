@@ -234,11 +234,11 @@ class UserInterface:
         self.new_pos = None
 
     def coord_game2ui(self, position):
-        def g2u(x): x*self.cell_size + self.cell_size//2 + self.padding
+        def g2u(x): return x*self.cell_size + self.cell_size//2 + self.padding
         return Coord(map(g2u, position))
 
     def coord_ui2game(self, position):
-        def u2g(x): (x - self.padding) // self.cell_size
+        def u2g(x): return (x - self.padding) // self.cell_size
         return Coord(map(u2g, position))
 
     def processInput(self):
@@ -312,4 +312,4 @@ class UserInterface:
 
 ui = UserInterface()
 ui.run()
-print(ui.gamestate.scoreboard)
+print("Scoreboard:", ui.gamestate.scoreboard)
