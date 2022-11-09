@@ -1,11 +1,3 @@
-'''
-from game.pygamegui import UserInterface
-
-ui = UserInterface()
-ui.run()
-print("Scoreboard:", ui.gamestate.scoreboard)
-'''
-
 from game.pygletgui import Main
 from game.gamestate import PaperRaceGameState, PaperRacePointType, Coord
 
@@ -16,3 +8,5 @@ if __name__ == '__main__':
     main = Main(gamestate)
 
     main.run()
+
+    print(gamestate.scoreboard)
