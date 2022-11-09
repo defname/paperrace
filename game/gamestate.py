@@ -618,7 +618,7 @@ class PaperRacer:
                 effect.apply()
                 # recalculate the other racer's next positions, since they
                 # are affected by the collision effect
-                other_racer.calc_possible_next_positions()
+                other_racer._calc_possible_next_positions()
                 # add the collision effect to own effects list
                 self.add_effect(PRCollisionEffect(self, other=False))
             else:
