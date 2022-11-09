@@ -4,6 +4,8 @@ from collections import OrderedDict
 from time import time
 from game.gamestate import PaperRaceGameState, PaperRacePointType, Coord
 import itertools
+import math
+import time
 
 key = pyglet.window.key
 
@@ -104,13 +106,57 @@ class Racer:
                  color=(255, 255, 255),
                  batch=None, group=None):
         size = grid_width
-        offset_x = (grid_width-size) // 2
-        offset_y = (grid_height-size) // 2
-        self.rect = pyglet.shapes.Rectangle(pos.x, pos.y, grid_width, grid_height, color, batch, group)
+        self.offset_x = (grid_width) // 2
+        self.offset_y = (grid_height) // 2
+        self.img = pyglet.image.load("res/car.png")
+        self.img.anchor_x = self.img.width // 2
+        self.img.anchor_y = self.img.height // 2
+        self.sprite = pyglet.sprite.Sprite(self.img, pos.x+self.offset_x, pos.y+self.offset_y, batch=batch, group=group)
+        self.sprite.scale = grid_width/self.img.width * 2.5
+        #self.sprite.anchor_x = self.sprite.width // 2
+        #self.sprite.anchor_y = self.sprite.height // 2
 
+        self.pos = None
+        self.update_pos(pos)
+        
+        #self.rect = pyglet.shapes.Rectangle(pos.x, pos.y, grid_width, grid_height, color, batch, group)
+
+    def _set_pos(self, pos):
+        self.sprite.x = pos.x + self.offset_x
+        self.sprite.y = pos.y + self.offset_y
+            
     def update_pos(self, pos):
-        self.rect.x = pos.x
-        self.rect.y = pos.y
+        if self.pos is None or self.pos == pos:
+            self.sprite.x = pos.x + self.offset_x
+            self.sprite.y = pos.y + self.offset_y
+            self.pos = pos
+            self._set_pos(pos)
+            self.moving = False
+            self.rotation = 0
+        else:
+            self.new_pos = pos
+            self.direction = self.new_pos - self.pos
+            self.unit_speed = self.direction.normalize()
+            self.motion_start_time = time.time()
+            self.rotation = 90 - math.atan2(self.unit_speed.y, self.unit_speed.x) * 180/math.pi
+            #self.rotation = self.speed.heading * 180/math.pi
+            self.sprite.rotation = self.rotation
+
+            pyglet.clock.schedule_interval(self._move, 1/60.0)
+
+    def _move(self, dt):
+        print("move")
+        self.moving = True
+        _dt = time.time() - self.motion_start_time
+        print(_dt)
+        if _dt < 1:
+            pos = self.pos + pyglet.math.Vec2(_dt*self.direction[0], _dt*self.direction[1])
+            self._set_pos(round(pos))
+        else:
+            self.pos = self.new_pos
+            self._set_pos(self.pos)
+            pyglet.clock.unschedule(self._move)
+            self.moving = False
 
 
 class RacerLayer(Layer):
@@ -193,7 +239,7 @@ class Main(pyglet.window.Window):
 
         if fps:
             self.sprites['fps_label'] = pyglet.text.Label('0 fps', x=10, y=10, batch=self.batch)
-            self.last_update = time()
+            self.last_update = time.time()
             self.fps_count = 0
 
         self.grid_layer = GridLayer(self.gamestate, self.width, self.height)
@@ -241,6 +287,9 @@ class Main(pyglet.window.Window):
             self.racer_layer.update_racer(racer_id)
             self.current_racer_layer.update()
 
+            if self.gamestate.finished:
+                self.alive = False
+
     def on_mouse_press(self, x, y, button, modifiers):
         if button == 1:
             print('Pressed mouse at {}x{}'.format(x, y))
@@ -271,10 +320,10 @@ class Main(pyglet.window.Window):
 
         # FPS stuff (if you want to)
         self.fps_count += 1
-        if time() - self.last_update > 1: # 1 sec passed
+        if time.time() - self.last_update > 1: # 1 sec passed
             self.sprites['fps_label'].text = str(self.fps_count)
             self.fps_count = 0
-            self.last_update = time()
+            self.last_update = time.time()
 
         # self.bg.draw()
         self.pre_render()
@@ -296,4 +345,5 @@ class Main(pyglet.window.Window):
             # -----------> This is key <----------
             # This is what replaces pyglet.app.run()
             # but is required for the GUI to not freeze
+            pyglet.clock.tick()
             event = self.dispatch_events()
