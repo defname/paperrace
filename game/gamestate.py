@@ -818,7 +818,7 @@ class PaperRaceGameState:
         self.grid = PaperRaceGrid(self.config)
         self.scoreboard = {}
 
-    def load_map(self, filename, nb_player):
+    def load_map(self, filename, nb_player=1):
         """Load the map specified by filename
 
         Load the map file in the configuration object, load the grid from the
