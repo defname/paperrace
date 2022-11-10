@@ -818,7 +818,7 @@ class PaperRaceGameState:
         self.grid = PaperRaceGrid(self.config)
         self.scoreboard = {}
 
-    def load_map(self, filename):
+    def load_map(self, filename, nb_player):
         """Load the map specified by filename
 
         Load the map file in the configuration object, load the grid from the
@@ -826,6 +826,7 @@ class PaperRaceGameState:
 
         Args:
             filename (str): path to the map file (the INI file)
+            nb_player (int): number of players (need to be at least 1)
         """
         self.config.load_map(filename)
 
@@ -835,10 +836,11 @@ class PaperRaceGameState:
 
         self.scoreboard.clear()
         self.finished = False
-        self.racer[0] = PaperRacer(0, self.grid, self,
-                                   random.choice(list(self.grid.startarea)))
-        self.racer[1] = PaperRacer(1, self.grid, self,
-                                   random.choice(list(self.grid.startarea)))
+
+        # add nb_number racer to the list
+        for i in range(nb_player):
+            self.racer[i] = PaperRacer(
+                i, self.grid, self, random.choice(list(self.grid.startarea)))
 
         self.current_racer_id = 0
 
