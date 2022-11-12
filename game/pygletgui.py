@@ -14,10 +14,6 @@ class GridPoint:
     def __init__(self, pos: pyglet.math.Vec2, grid_width, grid_height, size=15, width=2,
                  color=(255, 255, 255),
                  batch=None, group=None):
-        #self.rec = pyglet.shapes.BorderedRectangle(pos.x, pos.y, grid_width, grid_height, 2,
-        #                                   color=(255,255,255), border_color=color, batch=batch, group=group)
-        #self.rec.anchor_position = (-grid_height//2, -grid_width//2)
-        #color = (255-color[0]//2, 255-color[1]//2, 255-color[2]//2)
         offset_x = (grid_width-size) // 2
         offset_y = (grid_height-size) // 2
         self.line1 = pyglet.shapes.Line(offset_x+pos.x+size//2, offset_y+pos.y,
@@ -103,24 +99,32 @@ class GridLayer(Layer):
 
 class Racer:
     def __init__(self, pos: pyglet.math.Vec2, grid_width, grid_height,
-                 color=(255, 255, 255),
+                 image="res/car.png",
                  batch=None, group=None):
         size = grid_width
+        self.grid_width = grid_width
+        self.grid_height = grid_height
+        self.batch = batch
+        self.group = group
+        self.pos = pos
         self.offset_x = (grid_width) // 2
         self.offset_y = (grid_height) // 2
-        self.img = pyglet.image.load("res/car.png")
-        self.img.anchor_x = self.img.width // 2
-        self.img.anchor_y = self.img.height // 2
-        self.sprite = pyglet.sprite.Sprite(self.img, pos.x+self.offset_x, pos.y+self.offset_y, batch=batch, group=group)
-        self.sprite.scale = grid_width/self.img.width * 2.5
+        self.set_image(image)
         #self.sprite.anchor_x = self.sprite.width // 2
         #self.sprite.anchor_y = self.sprite.height // 2
 
-        self.pos = None
+        
         self.update_pos(pos)
         
         #self.rect = pyglet.shapes.Rectangle(pos.x, pos.y, grid_width, grid_height, color, batch, group)
 
+    def set_image(self, image):
+        self.img = pyglet.image.load(image)
+        self.img.anchor_x = self.img.width // 2
+        self.img.anchor_y = self.img.height // 2
+        self.sprite = pyglet.sprite.Sprite(self.img, self.pos.x+self.offset_x, self.pos.y+self.offset_y, batch=self.batch, group=self.group)
+        self.sprite.scale = self.grid_width/self.img.width * 2.5
+        
     def _set_pos(self, pos):
         self.sprite.x = pos.x + self.offset_x
         self.sprite.y = pos.y + self.offset_y
@@ -135,20 +139,18 @@ class Racer:
             self.rotation = 0
         else:
             self.new_pos = pos
+            self.pos = pyglet.math.Vec2(self.sprite.x - self.offset_x, self.sprite.y - self.offset_y)
             self.direction = self.new_pos - self.pos
             self.unit_speed = self.direction.normalize()
             self.motion_start_time = time.time()
             self.rotation = 90 - math.atan2(self.unit_speed.y, self.unit_speed.x) * 180/math.pi
-            #self.rotation = self.speed.heading * 180/math.pi
             self.sprite.rotation = self.rotation
 
             pyglet.clock.schedule_interval(self._move, 1/60.0)
 
     def _move(self, dt):
-        print("move")
         self.moving = True
         _dt = time.time() - self.motion_start_time
-        print(_dt)
         if _dt < 1:
             pos = self.pos + pyglet.math.Vec2(_dt*self.direction[0], _dt*self.direction[1])
             self._set_pos(round(pos))
@@ -160,17 +162,22 @@ class Racer:
 
 
 class RacerLayer(Layer):
+    images = ["res/viper.png", "res/taxi.png", "res/car.png", "res/audi.png"]
     def __init__(self, gamestate, width, height):
         super().__init__(gamestate, width, height)
 
         self.racer = {}
         for racer_id in self.gamestate.racer:
             game_pos = self.gamestate.racer[racer_id].position
-            self.racer[racer_id] = Racer(self.pos_game2ui(game_pos), self.grid_width, self.grid_height, batch=self.batch)
+            self.racer[racer_id] = Racer(self.pos_game2ui(game_pos), self.grid_width, self.grid_height, image=self.images[racer_id%4], batch=self.batch)
 
     def update_racer(self, racer_id):
         game_pos = self.gamestate.racer[racer_id].position
         self.racer[racer_id].update_pos(self.pos_game2ui(game_pos))
+
+    def racer_is_agent(self, racer_id):
+        #self.racer[racer_id].set_image("res/audi.png")
+        pass
 
 
 class CurrentRacerLayer(Layer):
@@ -213,6 +220,29 @@ class CurrentRacerLayer(Layer):
         self.line = None
 
 
+class AgentLayer(Layer):
+    def __init__(self, gamestate, width, height, agent):
+        super().__init__(gamestate, width, height)
+        self.agent = agent
+
+        self.points = {}
+
+        max_val = self.agent.max_h
+
+        for pos in self.agent.h:
+            p = self.pos_game2ui(pos)
+            h = self.agent.h[pos]
+            c = round(h/max_val * 255)
+            color = (c, c, c)
+            self.points[pos] = pyglet.shapes.Rectangle(
+                p.x,
+                p.y,
+                self.grid_width,
+                self.grid_height,
+                color=color,
+                batch=self.batch
+            )
+            self.points[pos].opacity = 170
 
 
 class Main(pyglet.window.Window):
@@ -253,6 +283,14 @@ class Main(pyglet.window.Window):
 
         self.alive = 1
 
+        self.agents = {}
+
+    def add_agent(self, agent, racer_id):
+        self.agents[racer_id] = agent
+        # DEBUG LAYER
+        self.agent_layer = AgentLayer(self.gamestate, self.width, self.height, agent)
+        self.racer_layer.racer_is_agent(racer_id)
+
     def pos_ui2game(self, x, y):
         gx = (x-0.5*self.grid_layer.grid_width) // self.grid_layer.grid_width
         gy = self.gamestate.grid.height - (y-0.5*self.grid_layer.grid_height) // self.grid_layer.grid_height - 1
@@ -271,6 +309,9 @@ class Main(pyglet.window.Window):
         self.mouse_game_pos = self.pos_ui2game(x, y)
 
         # print(self.mouse_game_pos, self.current_racer_layer.target_area)
+        if self.gamestate.current_racer_id in self.agents:
+            return
+        
         if self.mouse_game_pos in self.gamestate.current_racer().possible_next_positions \
                 or self.mouse_game_pos == self.gamestate.current_racer().crash_position:
             self.current_racer_layer.highlight_pos(self.mouse_game_pos)
@@ -279,7 +320,8 @@ class Main(pyglet.window.Window):
 
     def on_mouse_release(self, x, y, button, modifiers):
         print('Released mouse at {}x{}'.format(x, y))
-
+        if self.gamestate.current_racer_id in self.agents:
+            return
         if self.mouse_game_pos in self.gamestate.current_racer().possible_next_positions \
                 or self.mouse_game_pos == self.gamestate.current_racer().crash_position:
             racer_id = self.gamestate.current_racer_id
@@ -330,16 +372,30 @@ class Main(pyglet.window.Window):
 
         #for sprite in self.sprites:
         #    self.sprites[sprite].draw()
+
         
         self.grid_layer.batch.draw()
-        self.racer_layer.batch.draw()
+        self.agent_layer.batch.draw()
         self.current_racer_layer.batch.draw()
+        self.racer_layer.batch.draw()
         self.batch.draw()
 
         self.flip()
 
     def run(self):
         while self.alive == 1:
+            racer_id = self.gamestate.current_racer_id
+            if racer_id in self.agents and not self.racer_layer.racer[racer_id].moving:
+                pos = self.agents[self.gamestate.current_racer_id].next_position()
+
+                if not self.gamestate.goto(pos):
+                    raise NameError("Invalid move by agent")
+                self.racer_layer.update_racer(racer_id)
+                self.current_racer_layer.update()
+
+                if self.gamestate.finished:
+                    self.alive = False
+
             self.render()
 
             # -----------> This is key <----------

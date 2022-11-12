@@ -213,10 +213,10 @@ class PaperRaceGrid:
             elif pixel == self.config.streetcolor:
                 self.grid[x, y] = PaperRacePointType.STREET
             elif pixel == self.config.startcolor:
-                self.startarea.add((x, y))
+                self.startarea.add(Coord((x, y)))
                 self.grid[x, y] = PaperRacePointType.STREET
             elif pixel == self.config.destcolor:
-                self.destarea.add((x, y))
+                self.destarea.add(Coord((x, y)))
                 self.grid[x, y] = PaperRacePointType.STREET
             else:
                 if pixel in self.config.effects:
@@ -318,8 +318,8 @@ class PREffect:
         if self.duration == 0:
             return False
         self.duration -= 1
-        print("Apply effect", type(self), "on", self.racer.id,
-              "duration:", self.duration)
+        #print("Apply effect", type(self), "on", self.racer.id,
+        #      "duration:", self.duration)
         return True
 
 
@@ -533,7 +533,8 @@ class PaperRacer:
                     self.grid.effects[self.position].createNewEffectObj(self)
                 )
             else:
-                print("No effect associated!")
+                #print("No effect associated!")
+                pass
 
     def add_effect(self, effect):
         """Add an effect to the PRRacer.effects list.
@@ -693,7 +694,7 @@ class PREffectConfig:
             priority = self.config.getint("priority", 1)
             return PRMultiSpeedEffect(racer, multiplier, priority)
         elif self.type == "MAXSPEED":
-            maxspeed = self.config.getint("multiplier", 1)
+            maxspeed = self.config.getint("maxspeed", 1)
             priority = self.config.getint("priority", 1)
             duration = self.config.getint("duration", 5)
             return PRMaxSpeedEffect(racer, duration, maxspeed, priority)
@@ -771,7 +772,7 @@ class PRConfig:
             cp["General"].get("ui_bgcolor", "255,255,255")
         )
         self.blockcolor = self.str_to_color(
-            cp["General"].get("blockcolor", "0,0,0")
+            cp["General"].get("blockcolor", "255,0,0")
         )
         self.streetcolor = self.str_to_color(
             cp["General"].get("streetcolor", "255,255,255")
@@ -780,7 +781,7 @@ class PRConfig:
             cp["General"].get("startcolor", "0,255,0")
         )
         self.destcolor = self.str_to_color(
-            cp["General"].get("destcolor", "0,255,0")
+            cp["General"].get("destcolor", "255,0,255")
         )
 
         self.effects = dict()
@@ -868,7 +869,7 @@ class PaperRaceGameState:
             in the current_racer().possible_next_positions list)
         """
         if not self.current_racer().goto(position):
-            print("Something went wrong")
+            print("Something went wrong" + f" (racer_id: {self.current_racer_id}, pos: {position})")
             return False
         if self.current_racer().position in self.grid.destarea:
             self.scoreboard[self.current_racer_id] \
