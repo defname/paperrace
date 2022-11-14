@@ -1,9 +1,6 @@
 from game.gamestate import PaperRaceGameState, PaperRacePointType
 import random
 import collections
-import heapq
-import copy
-
 
 class PRAgent:
     """Base class for a PaperRace agent
@@ -30,9 +27,14 @@ class PRAgent:
         """Build the h dictionary.
 
         This is one of the key functions, since it builds the h dictionary
-        which provides the heuristic for the distance from the point (working
-        as key) to the destination area. As better this heuristic is, as
-        better every search algorithm will work.
+        which provides the heuristic for the distance from each point to the
+        destination area (dictionary key is the point, the value is the
+        distance).
+
+        Might be overwritten to fit the agent's needs.
+
+        In this specific heuristic streets are way cheaper than than sand,
+        what might not be useful for agents that simulate some future steps.
         """
         start = random.choice(tuple(self.gamestate.grid.destarea))
         queue = collections.deque()
@@ -80,6 +82,19 @@ class PRAgent:
                         queue.append(n)
 
     def apply_speed_effect(self, pos, speed):
+        """Apply an effect associated with the given position.
+
+        Check if there is an effect associated with the given position, apply
+        it to the the given speed and return the result.
+
+        Args:
+            pos (Coord):  position of the field to check for effects
+            speed (Coord): current speed
+
+        Returns:
+            (Coord) Return the changed speed. If no effect associated return
+            the unchanged speed.
+        """
         if pos in self.gamestate.grid.effects:
             effect = self.gamestate.grid.effects[pos]
             if effect.type == "SAND" or effect.type == "MULTISPEED":
@@ -91,22 +106,76 @@ class PRAgent:
         return round(speed)
 
     def next_position(self):
+        """Return the position, the agent's racer should move to.
+
+        This is the method that should be called by the GUI to get the
+        agent's next move to hand it over to the PaperRacerGameState.goto()
+        method.
+        
+        This method has to be overloaded by child classes.
+
+        It has to return a position from the racer's possible_next_positions
+        list or if it's empty the racer's crash_position, otherwise
+        PaperRacerGameState respectively PRRacer will produce errors
+        and might crash.
+
+        Returns:
+            (Coord) the position the agent should move to.
+        """
         raise NotImplementedError
 
 
 class SimplePRAgent2(PRAgent):
-    def __init__(self, gamestate, racer_id):
+    """Little bit better version of a simple agent.
+
+    This one makes a very simple simulation of it's own next few moves.
+    Some effects are applied to modify the speed according to effects on the
+    map, but only once, so the duration property of the effects have no
+    influence.
+
+    To simulate future steps, only the best, least and middle rated position
+    from possible_next_positions (according to PRAgent.h heuristic) is used,
+    to limit the branching factor.
+
+    Since the original heuristic produce wierd behaviour in some situations
+    the sand fields are changed to less costs (In some situations it is just
+    better to go over sand fields), since the agent put the negative effects
+    of using this fields in calculation.
+
+    With the search_depth attribute the number of future steps to simulate
+    can be specified, what leads to very different behaviours.
+    Suprisingly the result is not necessarily better with a better search
+    depth. I sadly don't have an explanation for this.
+
+    It's interesting to play around with the used heuristic (somethimes best
+    results are produced with the simplest heuristic that only give the
+    distance to the destination area indipendendly from the type of the
+    field) and different search depths.
+    """
+    
+    def __init__(self, gamestate, racer_id, search_depth=5):
+        """Initialize agent
+
+        Args:
+            look at PRAgent.init()
+            search_depth (int): number of steps to simulate
+        """
         super().__init__(gamestate, racer_id)
+        self._build_h()
+        self.search_depth = search_depth
 
     def next_position(self):
         # return crash position if there is no choice
         if not self.racer.possible_next_positions:
+            print("Agent goes to crash position")
             return self.racer.crash_position
 
         # current position of the agent's racer
         pos = self.racer.position
-        best_score = (float("inf"), 0)
-        best_position = None
+
+        best_position = min(self.racer.possible_next_positions, key=lambda p: self.h[p])
+        #best_score = (float("inf"), 0)
+        best_score = (self.h[best_position], 0)
 
         # choose the most promising position
         for new_pos in self.racer.possible_next_positions:
@@ -123,7 +192,7 @@ class SimplePRAgent2(PRAgent):
                 new_pos = line[1]
                 old_pos = line[1]
 
-            score = self._score(new_pos, old_pos)
+            score = self._score(new_pos, old_pos, self.search_depth)
             #new_pos2 = pos + 2 * speed
             #if self.gamestate.grid.is_reachable(pos, new_pos2) and self.h[new_pos2] < self.h[new_pos]:
             #    score *= self.h[new_pos2]/self.max_h
@@ -140,7 +209,7 @@ class SimplePRAgent2(PRAgent):
         #return random.choices(self.gamestate.grid.neighbours(pos), k=2)
         return [nh[0], nh[len(nh)//2], nh[-1]]
 
-    def _score(self, pos, old_pos, depth=5):
+    def _score(self, pos, old_pos, depth=6):
         if pos in self.gamestate.grid.destarea and pos != self.racer.position:
             return (0, -depth)
 
@@ -149,28 +218,76 @@ class SimplePRAgent2(PRAgent):
 
         if pos in self.racer.path:
             return (self.h[pos]+1, -depth)
-        
+
         speed = pos - old_pos
         speed = self.apply_speed_effect(pos, speed)
-        
+
         new_target = pos + speed
 
         #nh = self.gamestate.grid.neighbours(new_target)
         nh = self.neighbours(new_target)
         if not nh:
             return (self.h[pos], -depth)
-        
-        best_score = (self.h[pos], -depth)
-        
+
+        #best_score = (self.h[pos], -depth)
+        best_score = (float("inf"), -depth)
+
         for n in nh:
             if not self.gamestate.grid.is_reachable(pos, n):
                 continue
-            
+
             best_score = min(self._score(n, pos, depth-1), best_score)
-            
+
         return best_score
 
+    def _build_h(self, ):
+        """Build the h dictionary.
+
+        This is one of the key functions, since it builds the h dictionary
+        which provides the heuristic for the distance from the point (working
+        as key) to the destination area. As better this heuristic is, as
+        better every search algorithm will work.
+        """
+        start = random.choice(tuple(self.gamestate.grid.destarea))
+        queue = collections.deque()
+        queue.append(start)
+        self.h[start] = 0
+        visited = set()
+
+        while queue:
+            current = queue.popleft()
+            visited.add(current)
+
+            nh = self.gamestate.grid.neighbours(current)
+            for n in nh:
+                if self.gamestate.grid[n] == PaperRacePointType.BLOCK:
+                    continue
+                else:
+                    if current in self.gamestate.grid.destarea:
+                        costs = 0
+                    elif self.gamestate.grid[current] == PaperRacePointType.STREET:
+                        if self.gamestate.grid[n] == PaperRacePointType.STREET:
+                            costs = self.h[current] + 1
+                        else:
+                            costs = self.h[current] + 1.5
+                    else:
+                        costs = self.h[current] + 1.5
+
+                    if n not in self.h or self.h[n] > costs:
+                        self.h[n] = costs
+                        queue.append(n)
+
+
 class SimplePRAgent(PRAgent):
+    """A simple agent without any simulation.
+
+    It's choices mainly depends on the heuristic. To limit the speed and
+    prevent the agent to get too fast it checks the points in the current
+    direction with same speed (or changed speed if an effect is hit) if they
+    are reachable and score them less good if not.
+
+    Works suprisingly good, but it's also not a winner type of agent.
+    """
     def __init__(self, gamestate, racer_id):
         super().__init__(gamestate, racer_id)
 
@@ -232,215 +349,3 @@ class SimplePRAgent(PRAgent):
                 if abs(speed) > max_speed:
                     speed = (max_speed / abs(speed)) * speed
         return round(speed)
-
-
-class BetterPRAgent(PRAgent):
-    def __init__(self, gamestate, racer_id):
-        super().__init__(gamestate, racer_id)
-
-    def next_position(self):
-        if not self.racer.possible_next_positions:
-            return self.racer.crash_position
-
-        best_score = float("inf")
-        best_position = None
-        for n in self.racer.possible_next_positions:
-            score = self._score(n)
-            if score < best_score:
-                best_score = score
-                best_position = n
-        return best_position
-
-    def _score(self, pos, old_pos=None, depth=3):
-        if depth == 0:
-            return self.h[pos]
-
-        if old_pos is None:
-            old_pos = self.racer.position
-        speed = pos - old_pos
-
-        biggertargetarea = False
-        if pos in self.gamestate.grid.effects:
-            effect = self.gamestate.grid.effects[pos]
-            if effect.type == "SAND" or effect.type == "MULTISPEED":
-                speed *= effect.config.getint("multiplier", 0)
-            elif effect.type == "MAXSPEED":
-                max_speed = effect.config.getint("maxspeed", 0)
-                if abs(speed) > max_speed:
-                    speed = max_speed / abs(speed) * speed
-            elif effect.type == "BIGGERTARGETAREA":
-                biggertargetarea = True
-
-        next_positions = [pos] + self.gamestate.grid.neighbours(pos)
-
-        best_score = float("inf")
-        #best_pos = None
-        for new_pos in next_positions:
-            if not self.gamestate.grid.is_reachable(pos, new_pos):
-                score = self.h[pos]*2
-            else:
-                score = self._score(new_pos, pos, depth-1) + self.h[pos]
-            if score < best_score:
-                best_score = score
-                #best_pos = new_pos
-        return best_score
-
-
-class AStarPRAgent(PRAgent):
-    def __init__(self, gamestate, racer_id):
-        super().__init__(gamestate, racer_id)
-
-    def next_position(self):
-        target_node, came_from = self.a_star_search(1000)
-        if len(came_from) == 0:
-            return self.racer.crash_position
-
-        if target_node is None:
-            target_node = self.lowest_value_node(came_from)
-        print(target_node, self.h[target_node])
-        path = self.build_path(came_from, self.racer.position, target_node)
-        return path[-2]
-
-    def a_star_search(self, depth):
-        openlist = []  # priority queue
-        closedlist = set()
-
-        costs = {}
-        came_from = {}
-
-        for s in self.racer.possible_next_positions:
-            came_from[s] = self.racer.position
-            costs[s] = 1
-            speed = s - self.racer.position
-            heapq.heappush(openlist, (self.h[s], s, speed, depth))
-
-        while openlist:
-            _, c_pos, c_speed, d = heapq.heappop(openlist)
-
-            # destination area found
-            #if c_pos in self.gamestate.grid.destarea:
-            #    print("destination area reached")
-            #    return c_pos, came_from
-
-            # required depth is reached
-            #if d == 0:
-            #    return c_pos, came_from
-
-            closedlist.add((c_pos, speed))
-
-            ##########################################
-            # expand node
-            speed = self.apply_speed_effect(c_pos, speed)
-            target_pos = c_pos+speed
-
-            next_positions = []
-            if self.gamestate.grid.is_reachable(c_pos, target_pos):
-                next_positions = [target_pos]
-            next_positions += self.gamestate.grid.neighbours(c_pos + speed)
-
-            for n_pos in next_positions:
-                n_speed = n_pos - c_pos
-
-                #if (n_pos, n_speed) in closedlist:
-                #    continue
-
-                expected_costs = costs[c_pos] + 1
-
-                if n_pos not in costs or costs[n_pos] > expected_costs:
-                    costs[n_pos] = expected_costs
-                    came_from[n_pos] = c_pos
-                    f = self.h[n_pos] + costs[n_pos]
-                    heapq.heappush(openlist, (f, n_pos, n_speed, d-1))
-
-        # destination area not found
-        print("End of loop")
-        return None, came_from
-
-    def lowest_value_node(self, came_from):
-        return min(came_from, key=lambda p: self.h[p])
-
-    def build_path(self, came_from, start, end):
-        if start == end:
-            return [start]
-        if start not in came_from.values() or end not in came_from:
-            return []
-
-        path = []
-        node = end
-        while node != start:
-            path.append(node)
-            node = came_from[node]
-        path.append(start)
-
-        return path
-
-    def apply_speed_effect(self, pos, speed):
-        if pos in self.gamestate.grid.effects:
-            effect = self.gamestate.grid.effects[pos]
-            if effect.type == "SAND" or effect.type == "MULTISPEED":
-                speed = effect.config.getint("multiplier", 0) * speed
-            elif effect.type == "MAXSPEED":
-                max_speed = effect.config.getint("maxspeed", 0)
-                if abs(speed) > max_speed:
-                    speed = (max_speed / abs(speed)) * speed
-        return round(speed)
-
-
-class DFSPRAgent(PRAgent):
-    """Super time consuming...
-
-    cause of the deepcopy for every iteration, I guess
-    """
-    def __init__(self, gamestate, racer_id):
-        super().__init__(gamestate, racer_id)
-
-    def next_position(self):
-        self.calls = 0
-        best_score = self.max_h+10
-        best_pos = None
-        next_positions = sorted(self.racer.possible_next_positions, key=lambda p: self.h[p])
-        if len(next_positions) == 0:
-            return self.racer.crash_position
-        for pos in next_positions:
-            gs_copy = copy.deepcopy(self.gamestate)
-            gs_copy.goto(pos)
-            score = self._score_position(gs_copy)
-            print(pos, score)
-            if score < best_score:
-                best_score = score
-                best_pos = pos
-        print(best_score)
-        print(self.calls)
-        return best_pos
-
-    def _score_position(self, gamestate: PaperRaceGameState, max_score=float("inf"), depth=1):
-        self.calls += 1
-        pos = gamestate.racer[self.racer_id].position
-        if pos in gamestate.grid.destarea:
-            return 0
-        if depth == 0:
-            return self.h[pos]
-
-        while gamestate.current_racer_id != self.racer_id:
-            if len(gamestate.current_racer().possible_next_positions) > 0:
-                random_pos = random.choice(tuple(gamestate.current_racer().possible_next_positions))
-            else:
-                random_pos = gamestate.current_racer().crash_position
-            gamestate.goto(random_pos)
-
-        next_positions = gamestate.racer[self.racer_id].possible_next_positions
-        if len(next_positions) == 0:
-            next_positions = [gamestate.racer[self.racer_id].crash_position]
-        next_positions = sorted(next_positions, key=lambda p: self.h[p])
-
-        best_score = self.max_h+10
-        for n in next_positions:
-            gs_copy = copy.deepcopy(gamestate)
-            gs_copy.goto(n)
-            score = self._score_position(gs_copy, best_score, depth-1)
-            if score < best_score:
-                best_score = score
-                if score > max_score:
-                    return max_score
-
-        return best_score
