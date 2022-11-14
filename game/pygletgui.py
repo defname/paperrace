@@ -6,6 +6,7 @@ from game.gamestate import PaperRaceGameState, PaperRacePointType, Coord
 import itertools
 import math
 import time
+import random
 
 key = pyglet.window.key
 
@@ -98,26 +99,43 @@ class GridLayer(Layer):
 
 
 class Racer:
-    def __init__(self, pos: pyglet.math.Vec2, grid_width, grid_height,
-                 image="res/car.png",
-                 batch=None, group=None):
+    def __init__(self, pos: pyglet.math.Vec2, grid_width, grid_height, racer_id,
+                 image="res/car.png", show_path=True,
+                 batch=None, group=None, path_group=None):
         size = grid_width
         self.grid_width = grid_width
         self.grid_height = grid_height
+        self.racer_id = racer_id
         self.batch = batch
         self.group = group
         self.pos = pos
         self.offset_x = (grid_width) // 2
         self.offset_y = (grid_height) // 2
-        self.set_image(image)
+        
         #self.sprite.anchor_x = self.sprite.width // 2
         #self.sprite.anchor_y = self.sprite.height // 2
 
+        self.path = []
+        self.show_path = show_path
+        self.path_group = path_group
+        self.path_color = self._get_path_color()
+
+        self.label = pyglet.text.Label(text="{:d}".format(self.racer_id), bold=True, batch=self.batch, group=self.group)
+        (r, g, b) = self.path_color
+        self.label.color = (r, g, b, 255)
         
+        self.set_image(image)
         self.update_pos(pos)
         
         #self.rect = pyglet.shapes.Rectangle(pos.x, pos.y, grid_width, grid_height, color, batch, group)
 
+    def _get_path_color(self):
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+
+        return (r, g, b)
+        
     def set_image(self, image):
         self.img = pyglet.image.load(image)
         self.img.anchor_x = self.img.width // 2
@@ -128,8 +146,29 @@ class Racer:
     def _set_pos(self, pos):
         self.sprite.x = pos.x + self.offset_x
         self.sprite.y = pos.y + self.offset_y
+        self.label.x = pos.x - self.offset_x
+        self.label.y = pos.y - self.offset_y
+
+    def _update_path(self, pos):
+        if len(self.path) == 0:
+            self.path.append((pos, None))
+            return
+
+        line = pyglet.shapes.Line(
+            self.offset_x + self.path[-1][0].x,
+            self.offset_y + self.path[-1][0].y,
+            self.offset_x + pos.x,
+            self.offset_y + pos.y,
+            width=3,
+            color=self.path_color,
+            batch=self.batch,
+            group=self.path_group
+        )
+        self.path.append((pos, line))
             
+    
     def update_pos(self, pos):
+        self._update_path(pos)
         if self.pos is None or self.pos == pos:
             self.sprite.x = pos.x + self.offset_x
             self.sprite.y = pos.y + self.offset_y
@@ -163,13 +202,24 @@ class Racer:
 
 class RacerLayer(Layer):
     images = ["res/viper.png", "res/taxi.png", "res/car.png", "res/audi.png"]
+
     def __init__(self, gamestate, width, height):
         super().__init__(gamestate, width, height)
+
+        self.path_group = pyglet.graphics.OrderedGroup(0)
+        self.racer_group = pyglet.graphics.OrderedGroup(1)
 
         self.racer = {}
         for racer_id in self.gamestate.racer:
             game_pos = self.gamestate.racer[racer_id].position
-            self.racer[racer_id] = Racer(self.pos_game2ui(game_pos), self.grid_width, self.grid_height, image=self.images[racer_id%4], batch=self.batch)
+            self.racer[racer_id] = Racer(self.pos_game2ui(game_pos),
+                                         self.grid_width,
+                                         self.grid_height,
+                                         racer_id=racer_id,
+                                         image=self.images[racer_id%4],
+                                         batch=self.batch,
+                                         group=self.racer_group,
+                                         path_group=self.path_group)
 
     def update_racer(self, racer_id):
         game_pos = self.gamestate.racer[racer_id].position
