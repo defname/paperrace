@@ -1,6 +1,7 @@
 **/__pycache__
 **/.vscode
 /*.png
+!/screenshot01.png
 /*.dot
 res/Topdown_vehicle_sprites_pack/Ambulance.png
 res/Topdown_vehicle_sprites_pack/Audi.png
