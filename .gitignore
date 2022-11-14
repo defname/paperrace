@@ -2,3 +2,22 @@
 **/.vscode
 /*.png
 /*.dot
+res/Topdown_vehicle_sprites_pack/Ambulance.png
+res/Topdown_vehicle_sprites_pack/Audi.png
+res/Topdown_vehicle_sprites_pack/Black_viper.png
+res/Topdown_vehicle_sprites_pack/Car.png
+res/Topdown_vehicle_sprites_pack/Mini_truck.png
+res/Topdown_vehicle_sprites_pack/Mini_van.png
+res/Topdown_vehicle_sprites_pack/Police.png
+res/Topdown_vehicle_sprites_pack/preview_carspritespack.jpg
+res/Topdown_vehicle_sprites_pack/Read Me.txt
+res/Topdown_vehicle_sprites_pack/taxi.png
+res/Topdown_vehicle_sprites_pack/truck.png
+res/Topdown_vehicle_sprites_pack/Police_animation/1.png
+res/Topdown_vehicle_sprites_pack/Police_animation/2.png
+res/Topdown_vehicle_sprites_pack/Police_animation/3.png
+res/Topdown_vehicle_sprites_pack/ambulance_animation/1.png
+res/Topdown_vehicle_sprites_pack/ambulance_animation/2.png
+res/Topdown_vehicle_sprites_pack/ambulance_animation/3.png
+maps/map10.xcf
+TODO
