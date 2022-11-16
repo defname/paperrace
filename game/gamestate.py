@@ -68,6 +68,14 @@ class Coord(tuple):
     def scalar_multiplication(self, other):
         return sum([x * y for x, y in zip(self, other)])
 
+    @property
+    def x(self):
+        return self[0]
+
+    @property
+    def y(self):
+        return self[1]
+
 
 class PaperRacePointType(Enum):
     """Different types of points on the grid"""

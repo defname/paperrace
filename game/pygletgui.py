@@ -48,8 +48,8 @@ class GridLayer(Layer):
     def __init__(self, gamestate: PaperRaceGameState, width, height):
         super().__init__(gamestate, width, height)
 
-        self.background_group = pyglet.graphics.OrderedGroup(0)
-        self.points_group = pyglet.graphics.OrderedGroup(1)
+        self.background_group = pyglet.graphics.Group(order=0)
+        self.points_group = pyglet.graphics.Group(order=1)
 
         if self.gamestate.config.ui_background_image != "None":
             self.background_img = pyglet.image.load(
@@ -67,7 +67,7 @@ class GridLayer(Layer):
         self.points = {}
 
         for coord, t in self.grid.items():
-            p = self.pos_game2ui(coord)
+            p = Coord(self.pos_game2ui(coord))
             if t == PaperRacePointType.STREET:
                 self.points[p] = GridPoint(
                     p,
@@ -78,7 +78,7 @@ class GridLayer(Layer):
                     group=self.points_group
                 )
             elif t == PaperRacePointType.EFFECT:
-                self.points[p] = GridPoint(
+                self.points[Coord(p)] = GridPoint(
                     p,
                     self.grid_width,
                     self.grid_height,
@@ -206,8 +206,8 @@ class RacerLayer(Layer):
     def __init__(self, gamestate, width, height):
         super().__init__(gamestate, width, height)
 
-        self.path_group = pyglet.graphics.OrderedGroup(0)
-        self.racer_group = pyglet.graphics.OrderedGroup(1)
+        self.path_group = pyglet.graphics.Group(order=0)
+        self.racer_group = pyglet.graphics.Group(order=1)
 
         self.racer = {}
         for racer_id in self.gamestate.racer:
