@@ -179,7 +179,8 @@ class SimplePRAgent2(PRAgent):
 
         # choose the most promising position
         for new_pos in self.racer.possible_next_positions:
-            if new_pos in self.gamestate.grid.destarea:
+            if new_pos in self.gamestate.grid.destarea \
+                    and not self.gamestate.racer_on_position(new_pos):
                 return new_pos
 
             if new_pos == self.racer.position:
@@ -303,7 +304,8 @@ class SimplePRAgent(PRAgent):
 
         # choose the most promising position
         for new_pos in self.racer.possible_next_positions:
-            if new_pos in self.gamestate.grid.destarea:
+            if new_pos in self.gamestate.grid.destarea \
+                    and not self.gamestate.racer_on_position(new_pos):
                 return new_pos
 
             if self.gamestate.racer_on_position(new_pos):
